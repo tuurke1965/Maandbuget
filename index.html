@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#16324f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Maandbudget">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Maandbudget</title>
+<style>
+:root{--bg:#f3f6f8;--card:#fff;--blue:#16324f;--green:#2e7d32;--red:#c62828;--muted:#6b7280;--line:#dde4ea}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:#18212a}
+main{max-width:760px;margin:auto;padding:env(safe-area-inset-top) 14px calc(30px + env(safe-area-inset-bottom))}
+header{margin-top:14px;padding:20px;border-radius:20px;background:var(--blue);color:white;box-shadow:0 6px 18px #0002}
+h1{margin:0 0 4px;font-size:27px} header p{margin:0;opacity:.85}
+.monthbar{display:flex;gap:9px;margin:14px 0}.monthbar input{flex:1}
+input,button{font:inherit} input{border:1px solid var(--line);background:#fff;border-radius:12px;padding:12px}
+button{border:0;border-radius:12px;padding:12px 14px;font-weight:700;background:var(--blue);color:#fff}
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.box{background:#fff;border-radius:16px;padding:14px;box-shadow:0 3px 10px #0001}
+.box small{display:block;color:var(--muted);margin-bottom:5px}.box strong{font-size:19px}
+.card{background:#fff;border-radius:18px;overflow:hidden;margin-top:14px;box-shadow:0 3px 10px #0001}
+.card h2{font-size:18px;margin:0;padding:14px;background:#eaf1f6}
+.row{display:grid;grid-template-columns:1fr 120px 38px;gap:7px;align-items:center;padding:9px 11px;border-top:1px solid var(--line)}
+.money{width:100%;text-align:right;padding:9px}.x{background:#eef1f3;color:#555;padding:8px}
+.add{display:grid;grid-template-columns:1fr auto;gap:8px;padding:11px;border-top:1px solid var(--line)}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}.clear{background:#fbe9e9;color:var(--red)}
+.note{text-align:center;font-size:12px;color:var(--muted);margin-top:13px}.pos{color:var(--green)}.neg{color:var(--red)}
+@media(max-width:500px){.summary{grid-template-columns:1fr}.row{grid-template-columns:1fr 105px 36px}}
+</style>
+</head>
+<body><main>
+<header><h1>Maandbudget</h1><p>Inkomsten en uitgaven</p></header>
+<div class="monthbar"><input id="month" type="month"><button onclick="load()">Laden</button></div>
+<section class="summary">
+<div class="box"><small>Inkomsten</small><strong id="inc">€ 0,00</strong></div>
+<div class="box"><small>Uitgaven</small><strong id="exp">€ 0,00</strong></div>
+<div class="box"><small>Over</small><strong id="bal">€ 0,00</strong></div>
+</section>
+<section class="card"><h2>Inkomsten</h2><div id="income"></div><div class="add"><input id="ni" placeholder="Nieuwe inkomstenpost"><button onclick="add('income')">Toevoegen</button></div></section>
+<section class="card"><h2>Uitgaven</h2><div id="expense"></div><div class="add"><input id="ne" placeholder="Nieuwe uitgavenpost"><button onclick="add('expense')">Toevoegen</button></div></section>
+<div class="actions"><button onclick="save(true)">Opslaan</button><button class="clear" onclick="wipe()">Maand wissen</button></div>
+<div class="note">Gegevens worden lokaal op dit apparaat opgeslagen.</div>
+</main>
+<script>
+const dflt={income:["Salaris","Toeslagen / uitkering","Overige inkomsten"],expense:["Hypotheek / huur","Gas & elektriciteit","Water","Zorgverzekering","Overige verzekeringen","Internet / telefoon","Gemeentelijke lasten","Abonnementen","Boodschappen","Auto / vervoer","Kleding","Uit eten / vrije tijd","Overig","Sparen"]};
+let data;
+const fresh=()=>({income:dflt.income.map(name=>({name,value:0})),expense:dflt.expense.map(name=>({name,value:0}))});
+const key=()=>`mb_${month.value}`;
+const eur=n=>new Intl.NumberFormat("nl-NL",{style:"currency",currency:"EUR"}).format(n||0);
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+function render(){
+ ["income","expense"].forEach(t=>{let e=document.getElementById(t);e.innerHTML="";data[t].forEach((x,i)=>e.insertAdjacentHTML("beforeend",`<div class="row"><span>${esc(x.name)}</span><input class="money" type="number" inputmode="decimal" step=".01" min="0" value="${x.value||""}" oninput="setv('${t}',${i},this.value)"><button class="x" onclick="del('${t}',${i})">×</button></div>`))});
+ calc();
+}
+function calc(){let i=data.income.reduce((a,x)=>a+(+x.value||0),0),e=data.expense.reduce((a,x)=>a+(+x.value||0),0),b=i-e;inc.textContent=eur(i);exp.textContent=eur(e);bal.textContent=eur(b);bal.className=b<0?"neg":"pos"}
+function setv(t,i,v){data[t][i].value=+v||0;calc();save(false)}
+function add(t){let el=document.getElementById(t==="income"?"ni":"ne"),n=el.value.trim();if(!n)return;data[t].push({name:n,value:0});el.value="";render();save(false)}
+function del(t,i){data[t].splice(i,1);render();save(false)}
+function save(msg){localStorage.setItem(key(),JSON.stringify(data));if(msg)alert("Opgeslagen")}
+function load(){data=JSON.parse(localStorage.getItem(key())||"null")||fresh();render()}
+function wipe(){if(confirm("Deze maand wissen?")){localStorage.removeItem(key());data=fresh();render()}}
+month.value=new Date().toISOString().slice(0,7);load();
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+</script></body></html>
